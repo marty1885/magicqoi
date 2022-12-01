@@ -286,6 +286,185 @@ uint8_t* magicqoi_decode_stream_mem(const uint8_t* data, size_t data_len, size_t
     return buffer;
 }
 
+typedef struct {
+    uint8_t* data;
+    size_t size;
+    size_t capasity;
+} magicqoi_vector;
+
+magicqoi_vector make_magicqoi_vector(size_t initial_size) {
+    magicqoi_vector vec;
+    vec.data = NULL;
+    if(initial_size > 0)
+        vec.data = (uint8_t*)malloc(initial_size);
+    vec.size = 0;
+    vec.capasity = initial_size;
+    return vec;
+}
+
+void free_magicqoi_vector(magicqoi_vector* vec) {
+    if(vec->data)
+        free(vec->data);
+    vec->data = NULL;
+    vec->size = 0;
+    vec->capasity = 0;
+}
+
+void magicqoi_vector_push(magicqoi_vector* vec, void* data, size_t size) {
+    if(vec->size + size <= vec->capasity) {
+        memcpy(vec->data + vec->size, data, size);
+        vec->size += size;
+    }
+    else {
+        size_t new_capasity = vec->capasity * 1.5;
+        if(new_capasity < vec->size + size)
+            new_capasity = vec->size + size;
+        vec->data = (uint8_t*)realloc(vec->data, new_capasity);
+        memcpy(vec->data + vec->size, data, size);
+        vec->size += size;
+        vec->capasity = new_capasity;
+    }
+}
+
+static bool magicqoi_diff_encodable(qoi_pixel a, qoi_pixel b) {
+    int dr = a.color.r - b.color.r;
+    int dg = a.color.g - b.color.g;
+    int db = a.color.b - b.color.b;
+    return dr >= -2 && dr <= 1 && dg >= -2 && dg <= 1 && db >= -2 && db <= 1;
+}
+
+static bool magicqoi_luma_encodable(qoi_pixel a, qoi_pixel b) {
+    int dr = a.color.r - b.color.r;
+    int dg = a.color.g - b.color.g;
+    int db = a.color.b - b.color.b;
+    int dr_dg = dr - dg;
+    int db_dg = db - dg;
+    return dg >= -32 && dg <= 31 && dr_dg >= -8 && dr_dg <= 7 && db_dg >= -8 && db_dg <= 7;
+}
+
+uint8_t* magicqoi_encode_mem(const uint8_t* data, size_t width, size_t height, int channels, size_t* out_len)
+{
+    magicqoi_vector vec = make_magicqoi_vector(sizeof(qoi_header));
+    qoi_header header;
+    memcpy(header.magic, "qoif", 4);
+    header.width = width;
+    header.height = height;
+    header.channels = channels;
+    header.colorspace = 0; // TODO: support other colorspaces
+
+    if(!is_big_endian()) {
+        header.width = __builtin_bswap32(header.width);
+        header.height = __builtin_bswap32(header.height);
+    }
+
+    magicqoi_vector_push(&vec, &header, sizeof(qoi_header));
+
+    // The actual encoding
+    qoi_pixel pixel_lut[64];
+    memset(pixel_lut, 0, sizeof(pixel_lut));
+    qoi_pixel last_pix;
+    last_pix.color.r = 0;
+    last_pix.color.g = 0;
+    last_pix.color.b = 0;
+    last_pix.color.a = 255;
+
+    size_t i=0;
+    for(i=0; i<width*height; i++) {
+        qoi_pixel pix = last_pix;
+        if(channels == 4)
+            pix.word = ((int*)data)[i];
+        else {
+            pix.color.r = data[i*channels+0];
+            pix.color.g = data[i*channels+1];
+            pix.color.b = data[i*channels+2];
+        }
+
+        // If alpha differs. We have to use a full RGBA block
+        int hash = qoi_pixel_hash(pix);
+        if(pix.color.a != last_pix.color.a) {
+            qoi_op_rgba rgba_op;
+            rgba_op.tag = 0b11111111;
+            rgba_op.r = pix.color.r;
+            rgba_op.g = pix.color.g;
+            rgba_op.b = pix.color.b;
+            rgba_op.a = pix.color.a;
+            magicqoi_vector_push(&vec, &rgba_op, sizeof(qoi_op_rgba));
+        }
+        else if(last_pix.word == pix.word) {
+            qoi_op_run run_op;
+            run_op.tag = QOI_OP_RUN_OR_RAW;
+            // find the nun of current pixel
+            size_t run_len = 1;
+            while(i+run_len < width*height) {
+                qoi_pixel next_pix = last_pix;
+                if(channels == 4)
+                    next_pix.word = ((int*)data)[i+run_len];
+                else {
+                    next_pix.color.r = data[(i+run_len)*channels+0];
+                    next_pix.color.g = data[(i+run_len)*channels+1];
+                    next_pix.color.b = data[(i+run_len)*channels+2];
+                }
+                if(next_pix.word != pix.word)
+                    break;
+                run_len++;
+            }
+
+            while(run_len != 0) {
+                int encode_len = minof(run_len, 64);
+                run_op.run = encode_len - 1;
+                magicqoi_vector_push(&vec, &run_op, sizeof(qoi_op_run));
+                i += encode_len;
+                run_len -= encode_len;
+            }
+            i--;
+        }
+        else if(pixel_lut[hash].word == pix.word) {
+            qoi_op_index lut_op;
+            lut_op.tag = QOI_OP_INDEX;
+            lut_op.index = hash;
+            magicqoi_vector_push(&vec, &lut_op, sizeof(qoi_op_index));
+        }
+        else if(magicqoi_diff_encodable(pix, last_pix)) {
+            qoi_op_diff diff_op;
+            diff_op.tag = QOI_OP_DIFF;
+            diff_op.dr = pix.color.r - last_pix.color.r + 2;
+            diff_op.dg = pix.color.g - last_pix.color.g + 2;
+            diff_op.db = pix.color.b - last_pix.color.b + 2;
+            magicqoi_vector_push(&vec, &diff_op, sizeof(qoi_op_diff));
+        }
+        else if(magicqoi_luma_encodable(pix, last_pix)) {
+            qoi_op_luma luma_op;
+            luma_op.tag = QOI_OP_LUMA;
+
+            int dg = pix.color.g - last_pix.color.g;
+            int dr = pix.color.r - last_pix.color.r;
+            int db = pix.color.b - last_pix.color.b;
+            int dr_dg = dr - dg;
+            int db_dg = db - dg;
+            luma_op.dg = dg + 32;
+            luma_op.dr_dg = dr_dg + 8;
+            luma_op.db_dg = db_dg + 8;
+            magicqoi_vector_push(&vec, &luma_op, sizeof(qoi_op_luma));
+        }
+        // Worst case. Encode RGB block
+        else {
+            qoi_op_rgb rgb_op;
+            rgb_op.tag = 0b11111110;
+            rgb_op.r = pix.color.r;
+            rgb_op.g = pix.color.g;
+            rgb_op.b = pix.color.b;
+            magicqoi_vector_push(&vec, &rgb_op, sizeof(qoi_op_rgb));
+        }
+
+        last_pix.word = pix.word;
+        int new_hash = qoi_pixel_hash(pix);
+        qoi_pixel lut_pix = pixel_lut[new_hash];
+    }
+
+    *out_len = vec.size;
+    return vec.data;
+}
+
 #define MAGICQOI_ASSERT(x) if(!(x)) { fprintf(stderr, "assertion failed: %s\n", #x); abort(); }
 
 int mgqoi_internal_self_test()

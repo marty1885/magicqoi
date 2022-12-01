@@ -15,14 +15,21 @@ As of writing this document. MagicQOI is at least as fast as the official QOI im
 
 ## Use
 
-To build this project. You need a C11 capable compiler and CMake. The main API is `magicqoi_decode_mem` which decodes the a QOI image given the raw data pointer. Additionally you need a C++17 compiler and Google Benchmark to build the benchmark and examples.
+To build this project. You need a C11 capable compiler and CMake. The main API is `magicqoi_decode_mem` and `magicqoi_encode_mem` which encode/decodes the a QOI image given the raw data pointer. Additionally you need a C++17 compiler and Google Benchmark to build the benchmark and examples.
 
 ```c
+// to decode
 size_t width, height;
 int channels;
 uint8_t* raw_pixel = magicqoi_decode_mem(data, data_len, &width, &height, &channels);
 assert(raw_pixel != NULL);
 free(raw_pixel);
+
+// to encode
+size_t data_len;
+uint8_t* qoi_data = magicqoi_encode_mem(raw_pixel, width, height, channels, &data_len);
+assert(qoi_data != NULL);
+free(qoi_data);
 ```
 
 ## Performance
@@ -54,5 +61,6 @@ However. Performance comparsion to `rust-qoi` is unknown. I've ran both benchmar
 
 My current best guess of bottneck is the L1i or branch prediction. Evidence by the fact MagicQOI can hit 126Mp/s when decoding a stream of all `INDEX 0` operations. Also I haven't tested this on x64 CPUs.
 
-- [ ] QOI encoder
+- [x] QOI encoder
+  - [ ] Optimize encoder
 - [ ] Branchless decoding for QOI_OP_DIFF and QOI_OP_RUN (if possible)
