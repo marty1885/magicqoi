@@ -42,7 +42,7 @@ MagicQOI is marginly faster then the official qoi.h (~10%) at decoding the offic
 Loaded 2633 files. 1272MB total.
                 decode:ms       decode:Mp/s     decode:Mb/s
 magicqoi        13734           90.0035         92.6377
-qoi             14985           82.4897         84.904
+qoi.h           14985           82.4897         84.904
 
 ❯ ./benchmark/decode_benchmark
 (decoding qoi_logo.qoi)
@@ -64,3 +64,4 @@ My current best guess of bottneck is the L1i or branch prediction. Evidence by t
 - [x] QOI encoder
   - [ ] Optimize encoder
 - [ ] Branchless decoding for QOI_OP_DIFF and QOI_OP_RUN (if possible)
+- [ ] Unit tests

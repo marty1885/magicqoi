@@ -10,7 +10,6 @@
 
 int main()
 {
-    mgqoi_internal_self_test();
     std::ifstream in("test.qoi");
     if(in.good() == false) {
         std::cerr << "Cannot open test.qoi\n";
