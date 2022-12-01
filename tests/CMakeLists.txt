@@ -1,2 +1,4 @@
 add_executable(unittest unittest.cpp)
-target_link_libraries(unittest PRIVATE magicqoi)
+
+find_package(Catch2 3 REQUIRED)
+target_link_libraries(unittest PRIVATE magicqoi Catch2::Catch2)
