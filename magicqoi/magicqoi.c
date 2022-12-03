@@ -390,8 +390,6 @@ uint8_t* magicqoi_encode_mem(const uint8_t* data, size_t width, size_t height, i
 
         int hash = qoi_pixel_hash(pix);
         if(last_pix.word == pix.word) {
-            qoi_op_run run_op;
-            run_op.tag = QOI_OP_RUN_OR_RAW;
             // find the nun of current pixel
             size_t run_len = 1;
             while(i+run_len < width*height) {
@@ -409,20 +407,42 @@ uint8_t* magicqoi_encode_mem(const uint8_t* data, size_t width, size_t height, i
             }
 
             if(likely(run_len <= 62)) {
+                qoi_op_run run_op;
+                run_op.tag = QOI_OP_RUN_OR_RAW;
                 run_op.run = run_len-1;
                 magicqoi_vector_push(&vec, &run_op, sizeof(qoi_op_run));
                 i += run_len-1;
             }
             else {
-                size_t full_encoded = run_len / 62;
+                // Ok. The logic here is complex so I shall explain it. QOI supports up to repeating 62 pixels
+                // using the QOI_OP_RUN block. Hoever, in a large image, it is possible that the same pixel
+                // repeats more than 62 times. In this case, we may need to write many RUN block with the max 
+                // run length.
+                // Since the encoder seems to be bottlenecked by branch prediction and memory writes, we can
+                // optimize by btaching writes. Here we batch 2 writes at a time. Then there could be 3 cases:
+                //   1. No more pixel to write
+                //   2. Only <62 pixels left
+                //   3. 63-124 pixels left (a fully encoded run block + a partially encoded run block)
+                // We compute how many block we need to write and how long the last block is. Finally write them
+                //
+                // This optimization along generates a 10% overall speedup on my machine
+                // ~9% from cleaner easier to predict code (handle full and partial run block separately)
+                // ~1% from batching writes
+                qoi_op_run run_ops[2];
+                run_ops[0].tag = QOI_OP_RUN_OR_RAW;
+                run_ops[1].tag = QOI_OP_RUN_OR_RAW;
+                run_ops[0].run = 62 - 1;
+                run_ops[1].run = 62 - 1;
+                size_t double_encoded = run_len / (62*2);
+                bool full_encoded = run_len % (62*2) < 62;
                 size_t rest = run_len % 62;
-                run_op.run = 62 - 1;
-                for(size_t j=0; j<full_encoded; j++)
-                    magicqoi_vector_push(&vec, &run_op, sizeof(qoi_op_run));
-                if(rest) {
-                    run_op.run = rest-1;
-                    magicqoi_vector_push(&vec, &run_op, sizeof(qoi_op_run));
-                }
+                // the main write loop
+                for(size_t j=0; j<double_encoded; j++)
+                    magicqoi_vector_push(&vec, run_ops, sizeof(qoi_op_run)*2);
+                
+                // handle both last full and partial encoded blocks together
+                run_ops[full_encoded].run = rest - 1;
+                magicqoi_vector_push(&vec, run_ops, sizeof(qoi_op_run)*(full_encoded+1));
                 i+=run_len-1;
             }
             continue;
