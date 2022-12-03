@@ -55,6 +55,16 @@ benchmarkOfficalDecode       305718 ns       305262 ns         2293
 
 The main performance gain comes from batching RLE pixel writes and adding a special fast path for it. Other minor performance gains comes from reducing load on L1i cache/branch prediction.
 
+Encoding wise, MagicQOI is also ~10% faster. However performance degrades a bit when the image gets larger.
+
+```
+❯./benchmark/encode_set_benchmark /path/to/qoi/image/set/png
+Loaded 2634 files. 1207 MPixels total.
+                encode:ms       encode:Mp/s     encode:Mb/s     fin_size:MB
+magicqoi        15242           81.0991         16.5316         251.975
+qoi.h           17275           71.555          14.5861         251.975
+```
+
 However. Performance comparsion to `rust-qoi` is unknown. I've ran both benchmarks on the same machine. Yet rust-qoi's qoi.h benchmark ran 2.5~3x the speed of ours under the same dataset. Take both numbers with a grain of salt.
 
 ## Roadmap
@@ -63,7 +73,7 @@ My current best guess of bottneck is the L1i$ or branch prediction. Evidence by 
 
 - [x] Works under strict aliasing
 - [x] QOI encoder
-  - [ ] Optimize encoder
+  - [x] Optimize encoder
 - [ ] Branchless decoding for QOI_OP_DIFF and QOI_OP_RUN (if possible)
 - [ ] Unit tests
   - [x] Random image encod/decode parity
