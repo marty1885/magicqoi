@@ -7,6 +7,9 @@ include_directories(magicqoi)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Library shared by examples and benchmarks
+add_subdirectory(common)
+
 option(MAGICQOI_BUILD_EXAMPLES "Build examples" ON)
 if(MAGICQOI_BUILD_EXAMPLES)
     add_subdirectory(examples)

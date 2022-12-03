@@ -344,7 +344,8 @@ static bool magicqoi_luma_encodable(qoi_pixel a, qoi_pixel b) {
 
 uint8_t* magicqoi_encode_mem(const uint8_t* data, size_t width, size_t height, int channels, size_t* out_len)
 {
-    magicqoi_vector vec = make_magicqoi_vector(sizeof(qoi_header));
+    // QOI has a typical compression ratio of 8:1 (my guess)
+    magicqoi_vector vec = make_magicqoi_vector(sizeof(qoi_header)+width*height*channels/8);
     qoi_header header;
     memcpy(header.magic, "qoif", 4);
     header.width = width;
@@ -362,7 +363,7 @@ uint8_t* magicqoi_encode_mem(const uint8_t* data, size_t width, size_t height, i
     // The actual encoding
     qoi_pixel pixel_lut[64];
     memset(pixel_lut, 0, sizeof(pixel_lut));
-    qoi_pixel last_pix;
+    register qoi_pixel last_pix;
     last_pix.color.r = 0;
     last_pix.color.g = 0;
     last_pix.color.b = 0;
@@ -370,27 +371,25 @@ uint8_t* magicqoi_encode_mem(const uint8_t* data, size_t width, size_t height, i
 
     size_t i=0;
     for(i=0; i<width*height; i++) {
-        qoi_pixel pix = last_pix;
+        register qoi_pixel pix;
         if(channels == 4)
             pix.word = ((int*)data)[i];
         else {
             pix.color.r = data[i*channels+0];
             pix.color.g = data[i*channels+1];
             pix.color.b = data[i*channels+2];
+            pix.color.a = last_pix.color.a;
         }
 
-        // If alpha differs. We have to use a full RGBA block
+        int dr = pix.color.r - last_pix.color.r;
+        int dg = pix.color.g - last_pix.color.g;
+        int db = pix.color.b - last_pix.color.b;
+        int da = pix.color.a - last_pix.color.a;
+        int dr_dg = dr - dg;
+        int db_dg = db - dg;
+
         int hash = qoi_pixel_hash(pix);
-        if(pix.color.a != last_pix.color.a) {
-            qoi_op_rgba rgba_op;
-            rgba_op.tag = 0b11111111;
-            rgba_op.r = pix.color.r;
-            rgba_op.g = pix.color.g;
-            rgba_op.b = pix.color.b;
-            rgba_op.a = pix.color.a;
-            magicqoi_vector_push(&vec, &rgba_op, sizeof(qoi_op_rgba));
-        }
-        else if(last_pix.word == pix.word) {
+        if(last_pix.word == pix.word) {
             qoi_op_run run_op;
             run_op.tag = QOI_OP_RUN_OR_RAW;
             // find the nun of current pixel
@@ -409,14 +408,24 @@ uint8_t* magicqoi_encode_mem(const uint8_t* data, size_t width, size_t height, i
                 run_len++;
             }
 
-            while(run_len != 0) {
-                int encode_len = minof(run_len, 64);
-                run_op.run = encode_len - 1;
+            if(likely(run_len <= 62)) {
+                run_op.run = run_len-1;
                 magicqoi_vector_push(&vec, &run_op, sizeof(qoi_op_run));
-                i += encode_len;
-                run_len -= encode_len;
+                i += run_len-1;
             }
-            i--;
+            else {
+                size_t full_encoded = run_len / 62;
+                size_t rest = run_len % 62;
+                run_op.run = 62 - 1;
+                for(size_t j=0; j<full_encoded; j++)
+                    magicqoi_vector_push(&vec, &run_op, sizeof(qoi_op_run));
+                if(rest) {
+                    run_op.run = rest-1;
+                    magicqoi_vector_push(&vec, &run_op, sizeof(qoi_op_run));
+                }
+                i+=run_len-1;
+            }
+            continue;
         }
         else if(pixel_lut[hash].word == pix.word) {
             qoi_op_index lut_op;
@@ -424,23 +433,28 @@ uint8_t* magicqoi_encode_mem(const uint8_t* data, size_t width, size_t height, i
             lut_op.index = hash;
             magicqoi_vector_push(&vec, &lut_op, sizeof(qoi_op_index));
         }
-        else if(magicqoi_diff_encodable(pix, last_pix)) {
+        // We have to encode the entire pixel if alpha changed
+        else if(da != 0) {
+            qoi_op_rgba rgba_op;
+            rgba_op.tag = 0b11111111;
+            rgba_op.r = pix.color.r;
+            rgba_op.g = pix.color.g;
+            rgba_op.b = pix.color.b;
+            rgba_op.a = pix.color.a;
+            magicqoi_vector_push(&vec, &rgba_op, sizeof(qoi_op_rgba));
+        }
+        else if(dr >= -2 && dr <= 1 && dg >= -2 && dg <= 1 && db >= -2 && db <= 1) {
             qoi_op_diff diff_op;
             diff_op.tag = QOI_OP_DIFF;
-            diff_op.dr = pix.color.r - last_pix.color.r + 2;
-            diff_op.dg = pix.color.g - last_pix.color.g + 2;
-            diff_op.db = pix.color.b - last_pix.color.b + 2;
+            diff_op.dr = dr + 2;
+            diff_op.dg = dg + 2;
+            diff_op.db = db + 2;
             magicqoi_vector_push(&vec, &diff_op, sizeof(qoi_op_diff));
         }
-        else if(magicqoi_luma_encodable(pix, last_pix)) {
+        else if(dg >= -32 && dg <= 31 && dr_dg >= -8 && dr_dg <= 7 && db_dg >= -8 && db_dg <= 7) {
             qoi_op_luma luma_op;
             luma_op.tag = QOI_OP_LUMA;
 
-            int dg = pix.color.g - last_pix.color.g;
-            int dr = pix.color.r - last_pix.color.r;
-            int db = pix.color.b - last_pix.color.b;
-            int dr_dg = dr - dg;
-            int db_dg = db - dg;
             luma_op.dg = dg + 32;
             luma_op.dr_dg = dr_dg + 8;
             luma_op.db_dg = db_dg + 8;
@@ -457,8 +471,7 @@ uint8_t* magicqoi_encode_mem(const uint8_t* data, size_t width, size_t height, i
         }
 
         last_pix.word = pix.word;
-        int new_hash = qoi_pixel_hash(pix);
-        qoi_pixel lut_pix = pixel_lut[new_hash];
+        pixel_lut[hash] = pix;
     }
 
     *out_len = vec.size;

@@ -59,9 +59,11 @@ However. Performance comparsion to `rust-qoi` is unknown. I've ran both benchmar
 
 ## Roadmap
 
-My current best guess of bottneck is the L1i or branch prediction. Evidence by the fact MagicQOI can hit 126Mp/s when decoding a stream of all `INDEX 0` operations. Also I haven't tested this on x64 CPUs.
+My current best guess of bottneck is the L1i$ or branch prediction. Evidence by the fact MagicQOI can hit 126Mp/s when decoding a stream of all `INDEX 0` operations. Also I haven't tested this on x64 CPUs.
 
+- [x] Works under strict aliasing
 - [x] QOI encoder
   - [ ] Optimize encoder
 - [ ] Branchless decoding for QOI_OP_DIFF and QOI_OP_RUN (if possible)
 - [ ] Unit tests
+  - [x] Random image encod/decode parity
