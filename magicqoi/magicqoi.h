@@ -7,6 +7,14 @@
 extern "C" {
 #endif
 
+#if defined(__GNUC__) || defined(__clang__)
+#define MAGICQOI_CONSTFN __attribute__((const))
+#define MAGICQOI_PUREFN __attribute__((pure))
+#else
+#define MAGICQOI_CONSTFN
+#define MAGICQOI_PUREFN
+#endif
+
 /**
  * @brief Decode a QOI image from memory
  * 
@@ -17,6 +25,7 @@ extern "C" {
  * @param channels [out] The number of channels in the image
  * @return uint8_t* Pointer to the decoded image data. This must be freed with free(). NULL on error.
  */
+MAGICQOI_CONSTFN
 uint8_t* magicqoi_decode_mem(const uint8_t* data, size_t data_len, uint32_t* width, uint32_t* height, uint32_t* channels);
 
 /**
@@ -31,6 +40,7 @@ uint8_t* magicqoi_decode_mem(const uint8_t* data, size_t data_len, uint32_t* wid
  * @param channels Channels of the image
  * @return uint8_t* Pointer to the decoded image data. This must be freed with free(). NULL on error.
  */
+MAGICQOI_CONSTFN
 uint8_t* magicqoi_decode_stream_mem(const uint8_t* data, size_t data_len, uint32_t width, uint32_t height, uint32_t channels);
 
 /**
@@ -43,6 +53,7 @@ uint8_t* magicqoi_decode_stream_mem(const uint8_t* data, size_t data_len, uint32
  * @param out_len QOI encoded data length
  * @return uint8_t* Pointer to the encoded data. This must be freed with free(). NULL on error.
  */
+MAGICQOI_CONSTFN
 uint8_t* magicqoi_encode_mem(const uint8_t* data, uint32_t width, uint32_t height, int channels, size_t* out_len);
 
 /**

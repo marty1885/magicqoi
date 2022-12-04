@@ -23,8 +23,13 @@
 #define QOI_OP_LUMA 2
 #define QOI_OP_RUN_OR_RAW 3
 
+#if defined(__GNUC__) || defined(__clang__)
 #define likely(x)       __builtin_expect((x),1)
 #define unlikely(x)     __builtin_expect((x),0)
+#else
+#define likely(x)       (x)
+#define unlikely(x)     (x)
+#endif
 
 struct _qoi_header
 {
@@ -184,7 +189,6 @@ uint8_t* magicqoi_decode_stream_mem(const uint8_t* data, size_t data_len, uint32
 
         if(op_tag == QOI_OP_RUN_OR_RAW) {
             if(op == 0b11111110) {
-                static_assert(sizeof(qoi_op_rgb) == 4, "qoi_op_rgb size mismatch");
                 qoi_op_rgb rgb_op;
                 memcpy(&rgb_op, current_op, sizeof(rgb_op));
 
@@ -194,7 +198,6 @@ uint8_t* magicqoi_decode_stream_mem(const uint8_t* data, size_t data_len, uint32
                 current_op += sizeof(qoi_op_rgb);
             } 
             else if(op == 0b11111111) {
-                static_assert(sizeof(qoi_op_rgba) == 5, "qoi_op_rgba size mismatch");
                 last_pix.color.r = current_op[1];
                 last_pix.color.g = current_op[2];
                 last_pix.color.b = current_op[3];
@@ -202,7 +205,6 @@ uint8_t* magicqoi_decode_stream_mem(const uint8_t* data, size_t data_len, uint32
                 current_op += sizeof(qoi_op_rgba);
             } 
             else {
-                static_assert(sizeof(qoi_op_run) == 1, "qoi_op_run must have size 1");
                 current_op += sizeof(qoi_op_run);
                 int run_size = op_data + 1;
 
@@ -240,13 +242,11 @@ uint8_t* magicqoi_decode_stream_mem(const uint8_t* data, size_t data_len, uint32
             }
         }
         else if(op_tag == QOI_OP_INDEX) {
-            static_assert(sizeof(qoi_op_index) == 1, "qoi_op_index must have size 1");
             current_op += sizeof(qoi_op_index);
             last_pix = pixel_lut[op_data];
         }
         else if(op_tag == QOI_OP_DIFF) {
             qoi_op_diff diff_op;
-            static_assert(sizeof(qoi_op_diff) == 1, "qoi_op_diff must have size 1");
             (*(char*)&diff_op) = op;
             current_op += sizeof(qoi_op_diff);
             last_pix.color.r += diff_op.dr-2;
@@ -254,7 +254,6 @@ uint8_t* magicqoi_decode_stream_mem(const uint8_t* data, size_t data_len, uint32
             last_pix.color.b += diff_op.db-2;
         }
         else /*if(op_tag == QOI_OP_LUMA)*/ {
-            static_assert(sizeof(qoi_op_luma) == 2, "qoi_op_luma must have size 2");
             uint8_t next_byte = current_op[1];
             current_op += sizeof(qoi_op_luma);
             int dr_dg = (next_byte >> 4);
@@ -487,6 +486,13 @@ uint8_t* magicqoi_encode_mem(const uint8_t* data, uint32_t width, uint32_t heigh
 
 int mgqoi_internal_self_test()
 {
+    static_assert(sizeof(qoi_op_rgb) == 4, "qoi_op_rgb size mismatch");
+    static_assert(sizeof(qoi_op_rgba) == 5, "qoi_op_rgba size mismatch");
+    static_assert(sizeof(qoi_op_run) == 1, "qoi_op_run must have size 1");
+    static_assert(sizeof(qoi_op_index) == 1, "qoi_op_index must have size 1");
+    static_assert(sizeof(qoi_op_diff) == 1, "qoi_op_diff must have size 1");
+    static_assert(sizeof(qoi_op_luma) == 2, "qoi_op_luma must have size 2");
+    static_assert(sizeof(qoi_pixel) == 4, "qoi_pixel must have size 4");
     char op;
 
     op = 0b11111101;
