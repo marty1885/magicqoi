@@ -212,7 +212,7 @@ uint8_t* magicqoi_decode_stream_mem(const uint8_t* data, size_t data_len, uint32
                 while(likely(current_op < data_end)) {
                     const uint8_t op = *current_op;
                     const uint8_t run_tag = op >> 6;
-                    if(run_tag != QOI_OP_RUN_OR_RAW || op != 0b11111111 || op != 0b11111110)
+                    if(run_tag != QOI_OP_RUN_OR_RAW || op == 0b11111111 || op == 0b11111110)
                         break;
                     qoi_op_run run_op;
                     (*(char*)&run_op) = op;
