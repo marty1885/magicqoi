@@ -10,7 +10,6 @@
 
 namespace fs = std::filesystem;
 
-#define QOI_IMPLEMENTATION
 #include "qoi.h"
 
 std::vector<char> load_file(const std::string& path) {
@@ -43,7 +42,7 @@ std::vector<size_t> decode_all_qoi(const std::list<std::vector<char>>& buffers) 
         if(pix == nullptr)
             throw std::runtime_error("Failed to decode a image");
         results.push_back(desc.width*desc.height);
-        QOI_FREE(pix);
+        free(pix);
     }
     return results;
 }

@@ -3,8 +3,6 @@
 
 #include <magicqoi.h>
 #include "mgqoi_baseline.h" // non-optimized version of magicqoi
-
-#define QOI_IMPLEMENTATION
 #include "qoi.h"
 
 using namespace benchmark;
@@ -50,7 +48,7 @@ static void benchmarkOfficalDecode(State& state) {
             qoi_desc desc;
             auto pix = qoi_decode((uint8_t*)buf.data(), buf.size(), &desc, 0);
             DoNotOptimize(pix);
-            QOI_FREE(pix);
+            free(pix);
         }
     }
 }

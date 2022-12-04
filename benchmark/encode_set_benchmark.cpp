@@ -10,10 +10,7 @@
 
 namespace fs = std::filesystem;
 
-#define QOI_IMPLEMENTATION
 #include "qoi.h"
-
-#define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
 struct Image {
@@ -30,7 +27,7 @@ Image load_file(const std::string& path)
     if(data == nullptr)
         throw std::runtime_error("Cannot decode " + path + " file using stb_image");
     auto res = Image{std::vector<char>(data, data + width*height*channels), (size_t)width, (size_t)height, channels};
-    STBI_FREE(data);
+    free(data);
     return res;
 }
 
@@ -59,7 +56,7 @@ std::vector<size_t> encode_all_qoi(const std::list<Image>& buffers) {
         auto res = qoi_encode((uint8_t*)buf.data.data(), &desc, &out_len);
         if(res == nullptr)
             continue;
-        QOI_FREE(res);
+        free(res);
         results.push_back(out_len);
     }
     return results;
