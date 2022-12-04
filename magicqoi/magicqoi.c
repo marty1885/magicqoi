@@ -328,6 +328,8 @@ static void magicqoi_vector_push(magicqoi_vector* vec, void* data, size_t size) 
 
 uint8_t* magicqoi_encode_mem(const uint8_t* data, uint32_t width, uint32_t height, int channels, size_t* out_len)
 {
+    if(channels != 3 && channels != 4)
+        return NULL;
     // QOI has a typical compression ratio of 8:1 (my guess)
     magicqoi_vector vec = make_magicqoi_vector(sizeof(qoi_header)+width*height*channels/8);
     qoi_header header;
@@ -338,8 +340,8 @@ uint8_t* magicqoi_encode_mem(const uint8_t* data, uint32_t width, uint32_t heigh
     header.colorspace = 0; // TODO: support other colorspaces
 
     if(!is_big_endian()) {
-        header.width = __builtin_bswap32(header.width);
-        header.height = __builtin_bswap32(header.height);
+        header.width = htonl(header.width);
+        header.height = htonl(header.height);
     }
 
     magicqoi_vector_push(&vec, &header, sizeof(qoi_header));
@@ -353,8 +355,7 @@ uint8_t* magicqoi_encode_mem(const uint8_t* data, uint32_t width, uint32_t heigh
     last_pix.color.b = 0;
     last_pix.color.a = 255;
 
-    size_t i=0;
-    for(i=0; i<width*height; i++) {
+    for(size_t i=0; i<width*height; i++) {
         register qoi_pixel pix;
         if(channels == 4)
             pix.word = ((int*)data)[i];

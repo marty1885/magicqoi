@@ -77,7 +77,8 @@ My current best guess of bottneck is the L1i$ or branch prediction. Evidence by 
   - [ ] SIMD accelerated encoding
      * QOI is not sutable for encoding in SIMD. But can compute prerequisites in SIMD
 - [ ] Branchless decoding for QOI_OP_DIFF and QOI_OP_RUN (if possible)
-- [ ] C++ wrapper
+- [x] C++ wrapper
+- [ ] Handle failed allocation during decoding
 - [ ] Unit tests
   - [x] Random image encod/decode parity
   - [ ] Test more decoding bad streams

@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.15)
 project(magicqoi)
 
-add_library(magicqoi magicqoi/magicqoi.c)
+add_library(magicqoi magicqoi/magicqoi.c magicqoi/magicqoi.h magicqoi/magicqoi.hpp)
 include_directories(magicqoi)
 
 set(CMAKE_CXX_STANDARD 17)
