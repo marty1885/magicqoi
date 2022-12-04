@@ -136,7 +136,7 @@ static bool get_qoi_header(qoi_header* header, const uint8_t* data, size_t data_
     return true;
 }
 
-uint8_t* magicqoi_decode_mem(const uint8_t* data, size_t data_len, size_t* width, size_t* height, int* channels)
+uint8_t* magicqoi_decode_mem(const uint8_t* data, size_t data_len, uint32_t* width, uint32_t* height, uint32_t* channels)
 {
     qoi_header header;
     if(get_qoi_header(&header, data, data_len) == false)
@@ -151,7 +151,7 @@ uint8_t* magicqoi_decode_mem(const uint8_t* data, size_t data_len, size_t* width
     return result;
 }
 
-uint8_t* magicqoi_decode_stream_mem(const uint8_t* data, size_t data_len, size_t width, size_t height, int channels)
+uint8_t* magicqoi_decode_stream_mem(const uint8_t* data, size_t data_len, uint32_t width, uint32_t height, uint32_t channels)
 {
     uint8_t* buffer = (uint8_t*)malloc(width * height * channels);
     qoi_pixel pixel_lut[64];
@@ -292,7 +292,7 @@ typedef struct {
     size_t capasity;
 } magicqoi_vector;
 
-magicqoi_vector make_magicqoi_vector(size_t initial_size) {
+static magicqoi_vector make_magicqoi_vector(size_t initial_size) {
     magicqoi_vector vec;
     vec.data = NULL;
     if(initial_size > 0)
@@ -302,7 +302,7 @@ magicqoi_vector make_magicqoi_vector(size_t initial_size) {
     return vec;
 }
 
-void free_magicqoi_vector(magicqoi_vector* vec) {
+static void free_magicqoi_vector(magicqoi_vector* vec) {
     if(vec->data)
         free(vec->data);
     vec->data = NULL;
@@ -310,7 +310,7 @@ void free_magicqoi_vector(magicqoi_vector* vec) {
     vec->capasity = 0;
 }
 
-void magicqoi_vector_push(magicqoi_vector* vec, void* data, size_t size) {
+static void magicqoi_vector_push(magicqoi_vector* vec, void* data, size_t size) {
     if(vec->size + size <= vec->capasity) {
         memcpy(vec->data + vec->size, data, size);
         vec->size += size;
@@ -326,23 +326,7 @@ void magicqoi_vector_push(magicqoi_vector* vec, void* data, size_t size) {
     }
 }
 
-static bool magicqoi_diff_encodable(qoi_pixel a, qoi_pixel b) {
-    int dr = a.color.r - b.color.r;
-    int dg = a.color.g - b.color.g;
-    int db = a.color.b - b.color.b;
-    return dr >= -2 && dr <= 1 && dg >= -2 && dg <= 1 && db >= -2 && db <= 1;
-}
-
-static bool magicqoi_luma_encodable(qoi_pixel a, qoi_pixel b) {
-    int dr = a.color.r - b.color.r;
-    int dg = a.color.g - b.color.g;
-    int db = a.color.b - b.color.b;
-    int dr_dg = dr - dg;
-    int db_dg = db - dg;
-    return dg >= -32 && dg <= 31 && dr_dg >= -8 && dr_dg <= 7 && db_dg >= -8 && db_dg <= 7;
-}
-
-uint8_t* magicqoi_encode_mem(const uint8_t* data, size_t width, size_t height, int channels, size_t* out_len)
+uint8_t* magicqoi_encode_mem(const uint8_t* data, uint32_t width, uint32_t height, int channels, size_t* out_len)
 {
     // QOI has a typical compression ratio of 8:1 (my guess)
     magicqoi_vector vec = make_magicqoi_vector(sizeof(qoi_header)+width*height*channels/8);

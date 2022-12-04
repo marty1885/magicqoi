@@ -17,8 +17,7 @@ int main()
     }
     std::vector<char> buffer( std::istreambuf_iterator<char>(in),
                                 std::istreambuf_iterator<char>{});
-    size_t width, height;
-    int channels;
+    uint32_t width, height, channels;
 
     auto raw_pix = magicqoi_decode_mem((uint8_t*)buffer.data(), buffer.size(), &width, &height, &channels);
     stbi_write_png("test.png", width, height, channels, raw_pix, width*channels);

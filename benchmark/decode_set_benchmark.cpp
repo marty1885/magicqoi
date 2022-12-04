@@ -25,8 +25,7 @@ std::vector<char> load_file(const std::string& path) {
 std::vector<size_t> decode_all_magicqoi(const std::list<std::vector<char>>& buffers) {
     std::vector<size_t> results;
     for(auto& buf : buffers) {
-        size_t width, height;
-        int channels;
+        uint32_t width, height, channels;
         auto raw_pix = magicqoi_decode_mem((uint8_t*)buf.data(), buf.size(), &width, &height, &channels);
         if(raw_pix == nullptr)
             throw std::runtime_error("Failed to decode a image");

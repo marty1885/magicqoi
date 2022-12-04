@@ -17,7 +17,7 @@ extern "C" {
  * @param channels [out] The number of channels in the image
  * @return uint8_t* Pointer to the decoded image data. This must be freed with free(). NULL on error.
  */
-uint8_t* magicqoi_decode_mem(const uint8_t* data, size_t data_len, size_t* width, size_t* height, int* channels);
+uint8_t* magicqoi_decode_mem(const uint8_t* data, size_t data_len, uint32_t* width, uint32_t* height, uint32_t* channels);
 
 /**
  * @brief Decodes a QOI stream from memory. 
@@ -31,7 +31,7 @@ uint8_t* magicqoi_decode_mem(const uint8_t* data, size_t data_len, size_t* width
  * @param channels Channels of the image
  * @return uint8_t* Pointer to the decoded image data. This must be freed with free(). NULL on error.
  */
-uint8_t* magicqoi_decode_stream_mem(const uint8_t* data, size_t data_len, size_t width, size_t height, int channels);
+uint8_t* magicqoi_decode_stream_mem(const uint8_t* data, size_t data_len, uint32_t width, uint32_t height, uint32_t channels);
 
 /**
  * @brief Encode an image to QOI format
@@ -43,7 +43,7 @@ uint8_t* magicqoi_decode_stream_mem(const uint8_t* data, size_t data_len, size_t
  * @param out_len QOI encoded data length
  * @return uint8_t* Pointer to the encoded data. This must be freed with free(). NULL on error.
  */
-uint8_t* magicqoi_encode_mem(const uint8_t* data, size_t width, size_t height, int channels, size_t* out_len);
+uint8_t* magicqoi_encode_mem(const uint8_t* data, uint32_t width, uint32_t height, int channels, size_t* out_len);
 
 /**
  * @brief Self test for internal functions. This function is for MagicQOI developers only.

@@ -22,8 +22,7 @@ std::vector<std::vector<char>> buffer = {load_file("test.qoi")};
 static void benchmarkDecodeOptimized(State& state) {
     for (auto _ : state) {
         for(auto& buf : buffer) {
-            size_t width, height;
-            int channels;
+            uint32_t width, height, channels;
             auto raw_pix = magicqoi_decode_mem((uint8_t*)buf.data(), buf.size(), &width, &height, &channels);
             DoNotOptimize(raw_pix);
             free(raw_pix);
